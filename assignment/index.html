@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <title>Unemployment Rates in the US: 2001–2021</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        html,
+        body,
+        #map {
+            height: 100%;
+            margin: 0;
+            font-family: "Roboto Slab", serif;
+            background: #111;
+        }
+
+        h1 {
+            position: absolute;
+            z-index: 650;
+            top: 10px;
+            left: 15px;
+            padding: 8px 15px;
+            background: rgba(20, 20, 20, 0.85);
+            color: #f5f5f5;
+            border-radius: 5px;
+            font-weight: 600;
+        }
+
+
+        #info-icon {
+            position: absolute;
+            top: 120px;
+            right: 10px;
+            z-index: 5000;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: #ffffff;
+            cursor: pointer;
+            background: rgba(20, 20, 20, 0.9);
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.35);
+        }
+
+        #info-icon:hover {
+            background: rgba(40, 40, 40, 0.95);
+        }
+
+
+        .leaflet-top.leaflet-left {
+            top: 45%;
+        }
+
+        #ui-controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            font-family: "Roboto Slab", serif;
+            width: 240px;
+            padding: 10px;
+            background: rgba(20, 20, 20, 0.85);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+            color: #f0f0f0;
+            z-index: 650;
+        }
+
+        .year-slider {
+            width: 100%;
+        }
+
+        .slider-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9em;
+            margin-top: 4px;
+        }
+
+        .legend {
+            font-family: "Roboto Slab", serif;
+            padding: 6px 8px;
+            font-size: 1em;
+            background: rgba(25, 25, 25, 0.85);
+            color: #f0f0f0;
+            border-radius: 5px;
+            width: 180px;
+        }
+
+        .legend h3 {
+            font-size: 1.1em;
+            margin: 0;
+        }
+
+        .legend h3 span {
+            font-size: 1.3em;
+        }
+
+        .legend ul {
+            list-style: none;
+            padding: 0;
+            margin: 12px 4px 0;
+        }
+
+        .legend li {
+            height: 22px;
+        }
+
+        .legend span {
+            width: 30px;
+            height: 20px;
+            float: left;
+            margin-right: 10px;
+        }
+
+        #modal {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            padding: 10px;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #f0f0f0;
+            font-size: 1.05em;
+        }
+
+        #modal .container {
+            position: relative;
+            width: 560px;
+            max-width: 90%;
+            margin: 40px auto;
+            background: rgba(25, 25, 25, 0.96);
+            padding: 20px;
+            border-radius: 6px;
+            line-height: 1.6;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.45);
+        }
+
+        #modal .close-btn {
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            cursor: pointer;
+            font-size: 1.6em;
+            color: #ffffff;
+        }
+
+        #modal a {
+            color: #7ec8ff;
+            text-decoration: none;
+        }
+
+        #modal a:hover {
+            text-decoration: underline;
+        }
+    </style>
+
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@400;600&display=swap" rel="stylesheet">
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.4.2/chroma.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+
+</head>
+
+<body>
+
+    <h1>Unemployment Rates in the US: 2001 – 2021</h1>
+
+    <div id="info-icon" title="Map information">ℹ</div>
+
+    <div id="map"></div>
+
+    <div id="ui-controls">
+
+        <label for="slider">Year:</label>
+
+        <input type="range" id="slider" class="year-slider" min="2001" max="2021" value="2001" step="1" />
+
+        <div class="slider-labels">
+            <span>2001</span>
+            <span>2021</span>
+        </div>
+
+    </div>
+
+    <div id="modal">
+
+        <div class="container">
+
+            <span class="close-btn">&times;</span>
+
+            <h2>Map Info</h2>
+
+            <p>
+                This choropleth map visualizes annual county level unemployment rates across the United States
+                from 2001 through 2021. The map allows users to explore spatial and temporal changes in unemployment
+                patterns by moving the year slider.
+            </p>
+
+            <p>
+                County boundaries are joined to unemployment data using county FIPS codes.
+                A sequential color scheme highlights relative unemployment levels while state boundaries
+                are drawn above counties to improve geographic interpretation.
+            </p>
+
+            <p>
+                This interactive design enables users to compare spatial patterns of unemployment across
+                different years and observe how those patterns shift over time.
+            </p>
+
+            <p>
+                <strong>Author:</strong>
+                <a href="https://ipss.mgcafe.uky.edu/directory/victor-ugwuegbu" target="_blank">
+                    Victor Ugwuegbu
+                </a><br>
+                <strong>Course:</strong> MAP673: Design for Interactive Mapping
+            </p>
+
+            <p>
+                <strong>Data Sources:</strong><br>
+
+                County unemployment data:<br>
+                <a href="https://www.bls.gov/lau/" target="_blank">
+                    Bureau of Labor Statistics Local Area Unemployment Statistics
+                </a>
+                <br><br>
+
+                County and state boundaries:<br>
+                <a href="https://eric.clst.org/tech/usgeojson/" target="_blank">
+                    US GeoJSON Boundary Data
+                </a>
+
+            </p>
+
+        </div>
+    </div>
+
+    <script>
+        const map = L.map("map", {
+            center: [37.8, -96],
+            zoom: 4,
+            zoomControl: true
+        });
+
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+            attribution: "© CartoDB © OpenStreetMap contributors"
+        }).addTo(map);
+
+        let dataLayer;
+        let breaks, colorize;
+
+        const legendControl = L.control({
+            position: "topright"
+        });
+        legendControl.onAdd = () => L.DomUtil.create("div", "legend");
+        legendControl.addTo(map);
+
+        const slider = document.querySelector(".year-slider");
+
+        slider.addEventListener("input", function (e) {
+
+            const year = e.target.value;
+
+            if (dataLayer) {
+                updateMap(dataLayer, colorize, year);
+                updateLegend(breaks, colorize, year);
+            }
+
+        });
+
+        const modal = document.getElementById("modal");
+        const infoIcon = document.getElementById("info-icon");
+        const closeBtn = document.querySelector(".close-btn");
+
+        infoIcon.onclick = () => modal.style.display = "block";
+        closeBtn.onclick = () => modal.style.display = "none";
+
+        window.onclick = e => {
+            if (e.target === modal) {
+                modal.style.display = "none";
+            }
+        };
+
+        function updateMap(layer, colorize, year) {
+
+            layer.eachLayer(function (layer) {
+
+                const value = layer.feature.properties[year];
+
+                layer.setStyle({
+                    fillColor: value ? colorize(Number(value)) : "#ccc",
+                    fillOpacity: 0.9,
+                    color: "#444",
+                    weight: 0.5
+                });
+
+                const name = layer.feature.properties.NAME || "Unknown County";
+
+                const displayVal = value ?
+                    `${parseFloat(value).toFixed(1)}% Unemployment` :
+                    "No data";
+
+                layer.bindTooltip(`<strong>${name}</strong><br>${displayVal}`, {
+                    sticky: true
+                });
+
+                layer.on("mouseover", function () {
+                    layer.setStyle({
+                        weight: 2,
+                        color: "yellow"
+                    });
+                });
+
+                layer.on("mouseout", function () {
+                    layer.setStyle({
+                        weight: 0.5,
+                        color: "#444"
+                    });
+                });
+
+            });
+
+        }
+
+        function updateLegend(breaks, colorize, year) {
+
+            const legend = document.querySelector(".legend");
+
+            legend.innerHTML = `<h3><span>${year}</span> Unemployment Rates</h3><ul>`;
+
+            for (let i = 0; i < breaks.length - 1; i++) {
+
+                const color = colorize(breaks[i]);
+
+                legend.innerHTML += `<li>
+<span style="background:${color}"></span>
+${breaks[i].toFixed(1)}% – ${breaks[i+1].toFixed(1)}%
+</li>`;
+
+            }
+
+            legend.innerHTML += `</ul>`;
+
+        }
+
+        function processData(geojson, data) {
+
+            geojson.features.forEach(feature => {
+
+                const geoID = feature.properties.GEOID;
+
+                const match = data.find(row => row.STATE_FIP + row.COUNTY_FIP === geoID);
+
+                if (match) {
+                    feature.properties = {
+                        ...feature.properties,
+                        ...match
+                    };
+                }
+
+            });
+
+            const values = [];
+
+            geojson.features.forEach(feature => {
+                for (const year in feature.properties) {
+
+                    if (!isNaN(year) && year >= 2001 && year <= 2021) {
+
+                        const val = parseFloat(feature.properties[year]);
+
+                        if (!isNaN(val)) values.push(val);
+
+                    }
+
+                }
+            });
+
+            breaks = chroma.limits(values, "q", 5);
+            colorize = chroma.scale("OrRd").classes(breaks).mode("lab");
+
+            dataLayer = L.geoJson(geojson, {
+                style: {
+                    fillColor: "#ccc",
+                    fillOpacity: 0.9,
+                    color: "#444",
+                    weight: 0.5
+                }
+            }).addTo(map);
+
+            updateMap(dataLayer, colorize, "2001");
+            updateLegend(breaks, colorize, "2001");
+
+        }
+
+        fetch("data/us-counties.json")
+            .then(res => res.json())
+            .then(geojson => {
+
+                Papa.parse("data/us-unemployment-counties.csv", {
+
+                    download: true,
+                    header: true,
+
+                    complete: function (results) {
+                        processData(geojson, results.data);
+                    }
+
+                });
+
+            });
+
+        fetch("data/us-states.json")
+            .then(res => res.json())
+            .then(states => {
+
+                L.geoJson(states, {
+                    style: {
+                        color: "#00008B",
+                        weight: 11,
+                        fill: false
+                    }
+                }).addTo(map);
+
+            });
+    </script>
+
+</body>
+
+</html>
