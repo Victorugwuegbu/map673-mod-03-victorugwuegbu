@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Oregon Unemployment Rates: 2006 – 2015</title>
+  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" crossorigin="">
+  <link href="https://fonts.googleapis.com/css?family=Lato" rel="stylesheet" type="text/css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.1/papaparse.min.js" crossorigin="anonymous"
+    referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.1.2/chroma.min.js" crossorigin="anonymous"
+    referrerpolicy="no-referrer"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Lato, sans-serif;
+      background: whitesmoke;
+    }
+
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+
+    h1 {
+      position: absolute;
+      z-index: 650;
+      top: 10px;
+      left: 15px;
+      padding: 8px 15px;
+      margin: 0;
+      color: whitesmoke;
+      font-size: 1.5em;
+      background: rgba(25, 25, 25, 0.8);
+      border-radius: 5px;
+    }
+
+    h2 {
+      position: absolute;
+      z-index: 650;
+      top: 65px;
+      left: 15px;
+      padding: 8px 15px;
+      margin: 0;
+      color: whitesmoke;
+      font-size: 1.2em;
+      text-transform: uppercase;
+      background: rgba(25, 25, 25, 0.8);
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    h2:hover {
+      background: rgb(72, 72, 72);
+    }
+
+    h2:active {
+      background: rgb(228, 175, 0);
+    }
+
+    .legend {
+      font-family: Lato, sans-serif;
+      padding: 6px 8px;
+      font-size: 1em;
+      background: rgba(75, 75, 75, 0.8);
+      color: whitesmoke;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+      border-radius: 5px;
+      width: 160px;
+    }
+
+    .legend h3 {
+      font-size: 1.1em;
+      font-weight: bold;
+      margin: 0;
+    }
+
+    .legend h3 span {
+      font-size: 1.3em;
+      margin: 0 20px 0 0;
+    }
+
+    .legend ul {
+      list-style: none;
+      padding: 0;
+      margin: 12px 4px 0;
+    }
+
+    .legend li {
+      height: 22px;
+    }
+
+    .legend span {
+      width: 30px;
+      height: 20px;
+      float: left;
+      margin-right: 10px;
+    }
+
+    #ui-controls {
+      font-family: Lato, sans-serif;
+      width: 176px;
+      padding: 8px 25px 8px 15px;
+      background: rgba(75, 75, 75, 0.8);
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+      border-radius: 5px;
+      color: whitesmoke;
+    }
+
+    #ui-controls .min {
+      float: left;
+    }
+
+    #ui-controls .max {
+      float: right;
+      margin-right: -15px;
+    }
+
+    .year-slider {
+      width: 100%;
+    }
+
+    label {
+      font-size: 1.1em;
+      font-weight: bold;
+    }
+
+    #modal-content {
+      position: absolute;
+      top: 115px;
+      left: 15px;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 15px;
+      border-radius: 5px;
+      color: white;
+      max-width: 300px;
+      z-index: 700;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Oregon Unemployment Rates: 2006 – 2015</h1>
+  <h2 id="button">Info</h2>
+  <div id="map"></div>
+  <div id="ui-controls">
+    <label>
+      <span class="min">2006</span>
+      <input type="range" min="2006" max="2015" value="2006" step="1" class="year-slider">
+      <span class="max">2015</span>
+    </label>
+  </div>
+  <div id="modal" style="display: none;">
+    <div id="modal-content">
+      <p>This map shows Oregon unemployment rates from 2006 to 2015 by county. Data source: Bureau of Labor Statistics.
+      </p>
+      <p><a href="data/or-unemployment-rates.csv" style="color: yellow;">Download data</a></p>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" crossorigin=""></script>
+  <script>
+    const map = L.map('map').setView([44, -120.5], 7);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 20,
+    }).addTo(map);
+
+    let dataLayer;
+    let breaks;
+    let colorize;
+
+    document.getElementById("button").addEventListener("click", () => {
+      const modal = document.getElementById("modal");
+      modal.style.display = modal.style.display === "none" ? "block" : "none";
+    });
+
+    fetch("data/or-counties.json")
+      .then(response => response.json())
+      .then(geojson => {
+        Papa.parse("data/or-unemployment-rates.csv", {
+          download: true,
+          header: true,
+          complete: function (results) {
+            const csvData = results.data;
+            for (let i of geojson.features) {
+              for (let j of csvData) {
+                if (i.properties.COUNTYFP === j.COUNTY_FIP) {
+                  i.properties.unemploymentData = j;
+                  break;
+                }
+              }
+            }
+
+            const rates = [];
+            geojson.features.forEach(f => {
+              for (let key in f.properties.unemploymentData) {
+                if (!["COUNTY_FIP", "STATE_FIP", "NAME"].includes(key)) {
+                  rates.push(Number(f.properties.unemploymentData[key]));
+                }
+              }
+            });
+
+            breaks = chroma.limits(rates, 'q', 5);
+            colorize = chroma.scale(chroma.brewer.OrRd).classes(breaks).mode('lab');
+
+            drawMap(geojson, colorize, '2006');
+            drawLegend(breaks, colorize);
+            createSliderUI();
+          }
+        });
+      });
+
+    function drawMap(geojson, colorize, year) {
+      if (dataLayer) map.removeLayer(dataLayer);
+      dataLayer = L.geoJson(geojson, {
+        style: function (feature) {
+          const val = Number(feature.properties.unemploymentData[year]);
+          return {
+            fillColor: colorize(val),
+            color: "black",
+            weight: 1,
+            fillOpacity: 1
+          };
+        }
+      }).addTo(map);
+
+      map.fitBounds(dataLayer.getBounds());
+    }
+
+    function updateMap(layer, colorize, year) {
+      layer.eachLayer(function (l) {
+        const val = Number(l.feature.properties.unemploymentData[year]);
+        l.setStyle({
+          fillColor: colorize(val)
+        });
+      });
+    }
+
+    function drawLegend(breaks, colorize) {
+      const legend = L.control({
+        position: 'topright'
+      });
+      legend.onAdd = function () {
+        const div = L.DomUtil.create('div', 'legend');
+        div.innerHTML = '<h3><span>2006</span> Unemployment Rates</h3><ul>';
+        for (let i = 0; i < breaks.length - 1; i++) {
+          const color = colorize(breaks[i]).hex();
+          div.innerHTML +=
+            `<li><span style="background:${color}"></span>${breaks[i].toFixed(1)}% &ndash; ${breaks[i + 1].toFixed(1)}%</li>`;
+        }
+        div.innerHTML += '</ul>';
+        return div;
+      };
+      legend.addTo(map);
+    }
+
+    function createSliderUI() {
+      const sliderControl = L.control({
+        position: "bottomleft"
+      });
+      sliderControl.onAdd = function () {
+        const slider = L.DomUtil.get("ui-controls");
+        L.DomEvent.disableScrollPropagation(slider);
+        L.DomEvent.disableClickPropagation(slider);
+        return slider;
+      };
+      sliderControl.addTo(map);
+
+      const slider = document.querySelector(".year-slider");
+      slider.addEventListener("input", function (e) {
+        const currentYear = e.target.value;
+        document.querySelector(".legend h3 span").innerHTML = currentYear;
+        updateMap(dataLayer, colorize, currentYear);
+      });
+    }
+  </script>
+</body>
+
+</html>
